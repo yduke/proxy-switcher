@@ -1,48 +1,657 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <link rel="stylesheet" href="popup.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proxy Switcher</title>
+
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      /* Dark mode (default) */
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface2: #1a1a26;
+      --border: rgba(255,255,255,0.07);
+      --border-active: rgba(255,255,255,0.18);
+      --text: #e8e8f0;
+      --text-muted: #5a5a78;
+      --text-dim: #8888aa;
+      --logo-ring1: rgba(255,255,255,0.1);
+      --logo-ring2: rgba(255,255,255,0.2);
+      --settings-active-border: rgba(255,255,255,0.25);
+      --input-focus-border: rgba(255,255,255,0.25);
+      --input-focus-shadow: rgba(255,255,255,0.04);
+      --noise-opacity: 0.4;
+
+      --direct-color: #00e5a0;
+      --direct-glow: rgba(0, 229, 160, 0.25);
+      --direct-bg: rgba(0, 229, 160, 0.06);
+
+      --system-color: #5b9dff;
+      --system-glow: rgba(91, 157, 255, 0.25);
+      --system-bg: rgba(91, 157, 255, 0.06);
+
+      --custom-color: #e8426e;
+      --custom-glow: rgba(232, 66, 110, 0.22);
+      --custom-bg: rgba(232, 66, 110, 0.06);
+
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f4f4f8;
+        --surface: #ffffff;
+        --surface2: #ebebf2;
+        --border: rgba(0,0,0,0.08);
+        --border-active: rgba(0,0,0,0.2);
+        --text: #1a1a2e;
+        --text-muted: #9090aa;
+        --text-dim: #6868880;
+        --logo-ring1: rgba(0,0,0,0.1);
+        --logo-ring2: rgba(0,0,0,0.15);
+        --settings-active-border: rgba(0,0,0,0.3);
+        --input-focus-border: rgba(0,0,0,0.3);
+        --input-focus-shadow: rgba(0,0,0,0.05);
+        --noise-opacity: 0.15;
+
+        --direct-color: #00a870;
+        --direct-glow: rgba(0, 168, 112, 0.2);
+        --direct-bg: rgba(0, 168, 112, 0.07);
+
+        --system-color: #2979e8;
+        --system-glow: rgba(41, 121, 232, 0.2);
+        --system-bg: rgba(41, 121, 232, 0.07);
+
+        --custom-color: #d4244f;
+        --custom-glow: rgba(212, 36, 79, 0.2);
+        --custom-bg: rgba(212, 36, 79, 0.07);
+      }
+
+      body::before {
+        opacity: var(--noise-opacity);
+      }
+
+      .settings-btn.active {
+        border-color: var(--settings-active-border) !important;
+      }
+
+      .field input:focus,
+      .field textarea:focus {
+        border-color: var(--input-focus-border) !important;
+        box-shadow: 0 0 0 3px var(--input-focus-shadow) !important;
+      }
+
+      .proxy-btn.direct:hover,
+      .proxy-btn.direct.active {
+        box-shadow: 0 4px 20px var(--direct-glow), 0 0 0 1px var(--direct-color) !important;
+      }
+
+      .proxy-btn.system:hover,
+      .proxy-btn.system.active {
+        box-shadow: 0 4px 20px var(--system-glow), 0 0 0 1px var(--system-color) !important;
+      }
+
+      .proxy-btn.custom:hover,
+      .proxy-btn.custom.active {
+        box-shadow: 0 4px 20px var(--custom-glow), 0 0 0 1px var(--custom-color) !important;
+      }
+
+      .logo-icon .ring1 { stroke: var(--logo-ring1); }
+      .logo-icon .ring2 { stroke: var(--logo-ring2); }
+    }
+
+    body {
+      width: 320px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    /* Noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 100;
+      opacity: 0.4;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      position: relative;
+    }
+
+    .logo-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .logo-text {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+
+    .logo-text span {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .settings-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-dim);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .settings-btn:hover {
+      border-color: var(--border-active);
+      color: var(--text);
+      background: var(--surface2);
+    }
+
+    .settings-btn.active {
+      border-color: var(--settings-active-border);
+      color: var(--text);
+      background: var(--surface2);
+    }
+
+    .settings-btn svg {
+      width: 15px;
+      height: 15px;
+      transition: transform 0.4s ease;
+    }
+
+    .settings-btn.active svg {
+      transform: rotate(60deg);
+    }
+
+    /* Main buttons area */
+    .main-view {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .proxy-btn {
+      position: relative;
+      width: 100%;
+      padding: 16px 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+      text-align: left;
+    }
+
+    .proxy-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.22s ease;
+    }
+
+    .proxy-btn:hover {
+      border-color: var(--border-active);
+      transform: translateY(-1px);
+    }
+
+    .proxy-btn.active {
+      transform: translateY(-1px);
+    }
+
+    /* Direct */
+    .proxy-btn.direct:hover,
+    .proxy-btn.direct.active {
+      border-color: var(--direct-color);
+      background: var(--direct-bg);
+      box-shadow: 0 4px 24px var(--direct-glow), 0 0 0 1px var(--direct-color);
+    }
+
+    /* System */
+    .proxy-btn.system:hover,
+    .proxy-btn.system.active {
+      border-color: var(--system-color);
+      background: var(--system-bg);
+      box-shadow: 0 4px 24px var(--system-glow), 0 0 0 1px var(--system-color);
+    }
+
+    /* Custom */
+    .proxy-btn.custom:hover,
+    .proxy-btn.custom.active {
+      border-color: var(--custom-color);
+      background: var(--custom-bg);
+      box-shadow: 0 4px 24px var(--custom-glow), 0 0 0 1px var(--custom-color);
+    }
+
+    .btn-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.22s ease;
+    }
+
+    .direct .btn-icon {
+      background: rgba(0, 229, 160, 0.1);
+      color: var(--direct-color);
+    }
+    .direct.active .btn-icon,
+    .direct:hover .btn-icon {
+      background: rgba(0, 229, 160, 0.18);
+    }
+
+    .system .btn-icon {
+      background: rgba(91, 157, 255, 0.1);
+      color: var(--system-color);
+    }
+    .system.active .btn-icon,
+    .system:hover .btn-icon {
+      background: rgba(91, 157, 255, 0.18);
+    }
+
+    .custom .btn-icon {
+      background: rgba(255, 107, 157, 0.1);
+      color: var(--custom-color);
+    }
+    .custom.active .btn-icon,
+    .custom:hover .btn-icon {
+      background: rgba(255, 107, 157, 0.18);
+    }
+
+    .btn-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .btn-content {
+      flex: 1;
+    }
+
+    .btn-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .btn-desc {
+      font-size: 11px;
+      font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace;
+      color: var(--text-muted);
+      font-weight: 300;
+      line-height: 1.4;
+    }
+
+    .btn-status {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+    }
+
+    .direct.active .btn-status { background: var(--direct-color); border-color: var(--direct-color); box-shadow: 0 0 8px var(--direct-color); }
+    .system.active .btn-status { background: var(--system-color); border-color: var(--system-color); box-shadow: 0 0 8px var(--system-color); }
+    .custom.active .btn-status { background: var(--custom-color); border-color: var(--custom-color); box-shadow: 0 0 8px var(--custom-color); }
+
+    /* Settings panel */
+    .settings-view {
+      display: none;
+      padding: 16px;
+      flex-direction: column;
+      gap: 14px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .settings-view.visible {
+      display: flex;
+    }
+
+    .settings-view::-webkit-scrollbar {
+      width: 4px;
+    }
+    .settings-view::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .settings-view::-webkit-scrollbar-thumb {
+      background: var(--border-active);
+      border-radius: 2px;
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 90px;
+      gap: 8px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .field label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .field input,
+    .field textarea {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace;
+      font-size: 12px;
+      color: var(--text);
+      outline: none;
+      transition: all 0.18s ease;
+      width: 100%;
+    }
+
+    .field input::placeholder,
+    .field textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    .field input:focus,
+    .field textarea:focus {
+      border-color: var(--input-focus-border);
+      background: var(--surface2);
+      box-shadow: 0 0 0 3px var(--input-focus-shadow);
+    }
+
+    .field textarea {
+      resize: none;
+      height: 62px;
+      line-height: 1.6;
+    }
+
+    .save-btn {
+      width: 100%;
+      padding: 11px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--custom-glow);
+      background: var(--custom-bg);
+      color: var(--custom-color);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+    }
+
+    .save-btn:hover {
+      background: rgba(255,107,157,0.15);
+      border-color: var(--custom-color);
+      box-shadow: 0 4px 16px var(--custom-glow);
+    }
+
+    .save-btn:active {
+      transform: scale(0.98);
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      background: var(--surface2);
+      border: 1px solid var(--border-active);
+      border-radius: 20px;
+      padding: 7px 16px;
+      font-size: 12px;
+      font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace;
+      color: var(--text);
+      white-space: nowrap;
+      opacity: 0;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 200;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast.success { border-color: var(--direct-color); color: var(--direct-color); }
+    .toast.error { border-color: var(--custom-color); color: var(--custom-color); }
+
+    /* Animated entry */
+    .proxy-btn {
+      animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+    }
+    .proxy-btn:nth-child(1) { animation-delay: 0.04s; }
+    .proxy-btn:nth-child(2) { animation-delay: 0.08s; }
+    .proxy-btn:nth-child(3) { animation-delay: 0.12s; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .separator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .separator span {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .separator::before,
+    .separator::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <span class="title">代理切换</span>
-      <button id="settingsBtn" title="设置">⚙️</button>
-    </div>
 
-    <div class="button-group">
-      <button id="mode_direct" class="mode-btn">无代理</button>
-      <button id="mode_system" class="mode-btn">系统代理</button>
-      <button id="mode_fixed" class="mode-btn">自定义</button>
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="ring1" cx="14" cy="14" r="13" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+          <circle class="ring2" cx="14" cy="14" r="6" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+          <circle cx="14" cy="14" r="2.5" fill="#5b9dff"/>
+          <line x1="14" y1="1" x2="14" y2="8" stroke="#00e5a0" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="14" y1="20" x2="14" y2="27" stroke="#00e5a0" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="1" y1="14" x2="8" y2="14" stroke="#ff6b9d" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="20" y1="14" x2="27" y2="14" stroke="#ff6b9d" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="logo-text">PROXY<span>SWITCH</span></div>
     </div>
-
-    <div id="status" class="status-bar">当前模式: 加载中...</div>
-
-    <div id="settingsPanel" class="settings-panel hidden">
-      <h3>代理配置</h3>
-      <div class="input-row">
-        <label>HTTP</label>
-        <input type="text" id="httpIp" placeholder="IP">
-        <input type="text" id="httpPort" placeholder="端口" class="port">
-      </div>
-      <div class="input-row">
-        <label>HTTPS</label>
-        <input type="text" id="httpsIp" placeholder="IP">
-        <input type="text" id="httpsPort" placeholder="端口" class="port">
-      </div>
-      <div class="input-row">
-        <label>认证</label>
-        <input type="text" id="user" placeholder="用户名">
-        <input type="password" id="pass" placeholder="密码">
-      </div>
-      <div class="input-row">
-        <label>绕过</label>
-        <textarea id="bypass" rows="2"></textarea>
-      </div>
-      <button id="saveBtn" class="save-btn">保存并应用</button>
-    </div>
+    <button class="settings-btn" id="settingsToggle" title="设置">
+      <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M6.5 1.5h3l.5 1.5a4.5 4.5 0 0 1 1.06.62l1.54-.46 1.5 2.6-1.18 1.06c.05.37.05.75 0 1.12L14.1 9l-1.5 2.6-1.54-.46A4.5 4.5 0 0 1 10 11.76l-.5 1.74h-3l-.5-1.74a4.5 4.5 0 0 1-1.06-.62L3.4 11.6 1.9 9l1.18-1.06a4.5 4.5 0 0 1 0-1.12L1.9 5.76l1.5-2.6 1.54.46A4.5 4.5 0 0 1 6 3.0L6.5 1.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+        <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+    </button>
   </div>
+
+  <!-- Main Proxy Buttons -->
+  <div class="main-view" id="mainView">
+    <button class="proxy-btn direct" id="btn-direct" data-mode="direct">
+      <div class="btn-icon">
+        <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 2L9 16M2 9L16 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="9" cy="9" r="3" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div class="btn-content">
+        <div class="btn-title">无代理</div>
+        <div class="btn-desc">直连互联网，绕过系统代理</div>
+      </div>
+      <div class="btn-status"></div>
+    </button>
+
+    <button class="proxy-btn system" id="btn-system" data-mode="system">
+      <div class="btn-icon">
+        <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M6 16h6M9 13v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="btn-content">
+        <div class="btn-title">系统代理</div>
+        <div class="btn-desc">遵循操作系统的代理配置</div>
+      </div>
+      <div class="btn-status"></div>
+    </button>
+
+    <button class="proxy-btn custom" id="btn-custom" data-mode="custom">
+      <div class="btn-icon">
+        <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M2 9h3l2-5 3 10 2-5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="btn-content">
+        <div class="btn-title">自定义</div>
+        <div class="btn-desc">使用自定义代理服务器</div>
+      </div>
+      <div class="btn-status"></div>
+    </button>
+  </div>
+
+  <!-- Settings Panel -->
+  <div class="settings-view" id="settingsView">
+
+    <div class="separator"><span>HTTP 代理</span></div>
+    <div class="field-group">
+      <div class="field-row">
+        <div class="field">
+          <label>服务器 IP</label>
+          <input type="text" id="httpHost" placeholder="127.0.0.1">
+        </div>
+        <div class="field">
+          <label>端口</label>
+          <input type="text" id="httpPort" placeholder="8080">
+        </div>
+      </div>
+    </div>
+
+    <div class="separator"><span>HTTPS 代理</span></div>
+    <div class="field-group">
+      <div class="field-row">
+        <div class="field">
+          <label>服务器 IP</label>
+          <input type="text" id="httpsHost" placeholder="同 HTTP 代理">
+        </div>
+        <div class="field">
+          <label>端口</label>
+          <input type="text" id="httpsPort" placeholder="8080">
+        </div>
+      </div>
+    </div>
+
+    <div class="separator"><span>认证信息</span></div>
+    <div class="field-group">
+      <div class="field-row">
+        <div class="field">
+          <label>用户名</label>
+          <input type="text" id="username" placeholder="可选">
+        </div>
+        <div class="field">
+          <label>密码</label>
+          <input type="password" id="password" placeholder="可选">
+        </div>
+      </div>
+    </div>
+
+    <div class="separator"><span>绕过代理</span></div>
+    <div class="field">
+      <textarea id="bypass" placeholder="localhost, 127.0.0.1, 192.168.*.*"></textarea>
+    </div>
+
+    <button class="save-btn" id="saveBtn">保存设置</button>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+
   <script src="popup.js"></script>
 </body>
 </html>
