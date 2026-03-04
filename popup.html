@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="title">代理切换</span>
+      <button id="settingsBtn" title="设置">⚙️</button>
+    </div>
+
+    <div class="button-group">
+      <button id="mode_direct" class="mode-btn">无代理</button>
+      <button id="mode_system" class="mode-btn">系统代理</button>
+      <button id="mode_fixed" class="mode-btn">自定义</button>
+    </div>
+
+    <div id="status" class="status-bar">当前模式: 加载中...</div>
+
+    <div id="settingsPanel" class="settings-panel hidden">
+      <h3>代理配置</h3>
+      <div class="input-row">
+        <label>HTTP</label>
+        <input type="text" id="httpIp" placeholder="IP">
+        <input type="text" id="httpPort" placeholder="端口" class="port">
+      </div>
+      <div class="input-row">
+        <label>HTTPS</label>
+        <input type="text" id="httpsIp" placeholder="IP">
+        <input type="text" id="httpsPort" placeholder="端口" class="port">
+      </div>
+      <div class="input-row">
+        <label>认证</label>
+        <input type="text" id="user" placeholder="用户名">
+        <input type="password" id="pass" placeholder="密码">
+      </div>
+      <div class="input-row">
+        <label>绕过</label>
+        <textarea id="bypass" rows="2"></textarea>
+      </div>
+      <button id="saveBtn" class="save-btn">保存并应用</button>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

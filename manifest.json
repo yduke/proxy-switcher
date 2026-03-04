@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "极简代理切换器",
+  "version": "1.0",
+  "description": "一键切换无代理、系统代理和自定义代理",
+  "permissions": [
+    "proxy",
+    "storage",
+    "webRequest",
+    "webRequestAuthProvider"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
