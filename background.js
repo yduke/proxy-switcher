@@ -6,6 +6,7 @@ const MODE_COLORS = {
   custom: '#e8426e',  // red
 };
 
+
 function setIcon(mode) {
   const color = MODE_COLORS[mode] || MODE_COLORS.system;
   const sizes = [16, 48, 128];
@@ -16,39 +17,50 @@ function setIcon(mode) {
     const ctx = canvas.getContext('2d');
     const cx = size / 2;
     const cy = size / 2;
-    const r = size / 2;
+    const padding = size * 0.18;
 
-    // Outer ring (subtle)
-    ctx.beginPath();
-    ctx.arc(cx, cy, r - 1, 0, Math.PI * 2);
-    ctx.strokeStyle = color + '40';
-    ctx.lineWidth = size * 0.08;
-    ctx.stroke();
-
-    // Inner ring
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
-    ctx.strokeStyle = color + '80';
-    ctx.lineWidth = size * 0.07;
-    ctx.stroke();
-
-    // Center dot
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.28, 0, Math.PI * 2);
     ctx.fillStyle = color;
-    ctx.fill();
 
-    // Crosshair lines
-    const lineLen = r * 0.28;
-    const gap = r * 0.32;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(1, size * 0.07);
-    ctx.lineCap = 'round';
+    switch (mode) {
+      case 'direct': {
+        // Rounded square
+        const s = size - padding * 2;
+        const r = size * 0.12;
+        ctx.beginPath();
+        ctx.roundRect(padding, padding, s, s, r);
+        ctx.fill();
+        break;
 
-    ctx.beginPath(); ctx.moveTo(cx, cy - gap); ctx.lineTo(cx, cy - gap - lineLen); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx, cy + gap); ctx.lineTo(cx, cy + gap + lineLen); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx - gap, cy); ctx.lineTo(cx - gap - lineLen, cy); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx + gap, cy); ctx.lineTo(cx + gap + lineLen, cy); ctx.stroke();
+      }
+      case 'system': {
+        // Filled circle
+        const radius = (size - padding * 2) / 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'custom': {
+        // Triangle pointing up
+        const topY = padding;
+        const bottomY = size - padding;
+        const leftX = padding;
+        const rightX = size - padding;
+        ctx.beginPath();
+        ctx.moveTo(cx, topY);
+        ctx.lineTo(rightX, bottomY);
+        ctx.lineTo(leftX, bottomY);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      default: {
+        const radius = (size - padding * 2) / 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
 
     imageData[size] = ctx.getImageData(0, 0, size, size);
   }
@@ -74,10 +86,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Restore correct icon color when service worker restarts
-chrome.storage.local.get(['proxyMode'], (result) => {
-  setIcon(result.proxyMode || 'system');
-});
+// Restore correct icon when service worker wakes up
+function restoreIcon() {
+  chrome.storage.local.get(['proxyMode'], (result) => {
+    setIcon(result.proxyMode || 'system');
+  });
+}
+restoreIcon();
+
+// Ensure icon is set immediately on browser startup
+chrome.runtime.onStartup.addListener(restoreIcon);
 
 async function applyProxy(mode, config) {
   return new Promise((resolve, reject) => {
